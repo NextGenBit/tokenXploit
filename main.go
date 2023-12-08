@@ -39,8 +39,6 @@ func GetUserName() (string, error) {
 
 func main() {
 
-	privileges := []string{"SeAssignPrimaryTokenPrivilege", "SeDebugPrivilege", "SeImpersonatePrivilege"}
-
 	application := flag.String("application", "cmd.exe", "Specify the application to execute")
 	pid := flag.Int("pid", 0, "Specify the process ID")
 
@@ -50,16 +48,6 @@ func main() {
 	if *pid == 0 {
 		fmt.Println("Error: -pid is is required")
 		os.Exit(1)
-	}
-
-	for _, privilege := range privileges {
-		err := enablePrivilege(privilege)
-		if err != nil {
-			fmt.Printf("[%v] failed: %v\n", privilege, err)
-			return
-		} else {
-			fmt.Printf("[%v] enabled!\n", privilege)
-		}
 	}
 
 	tokenp, err := GetToken(int(*pid))
@@ -131,33 +119,4 @@ func GetToken(pid int) (*windows.Token, error) {
 	}
 
 	return &duplicatedToken, nil
-}
-
-func enablePrivilege(privilege string) error {
-	var token windows.Token
-	var luid windows.LUID
-
-	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
-	if err != nil {
-		return fmt.Errorf("OpenProcessToken failed: %w", err)
-	}
-	defer token.Close()
-
-	privilegePtr, err := windows.UTF16PtrFromString(privilege)
-	if err != nil {
-		return fmt.Errorf("UTF16PtrFromString failed: %w", err)
-	}
-
-	err = windows.LookupPrivilegeValue(nil, privilegePtr, &luid)
-	if err != nil {
-		return fmt.Errorf("LookupPrivilegeValue failed: %w", err)
-	}
-
-	tp := windows.Tokenprivileges{
-		PrivilegeCount: 1,
-		Privileges:     [1]windows.LUIDAndAttributes{{Luid: luid, Attributes: windows.SE_PRIVILEGE_ENABLED}},
-	}
-
-	var returnLength uint32
-	return windows.AdjustTokenPrivileges(token, false, &tp, 0, nil, &returnLength)
 }
